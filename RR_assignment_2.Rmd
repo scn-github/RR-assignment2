@@ -1,0 +1,130 @@
+---
+title: "Preliminary analysis of NOAA storm event data"
+author: "Steve Newbold"
+date: "Friday, January 29, 2016"
+output: html_document
+---
+
+## Synopsis
+
+I examined data from NOAA's storm event database to determine which types of storm events 1) are most harmful to population health and 2) have the greatest economic consequences. To avoid data quality issues for early years in the database, I focused on events between 1990 and 2015. 
+
+## Data processing
+
+This report includes the results of the analysis all R code used to conduct the analysis. 
+
+First, instruct R to cache operations in all code cunks:
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache=TRUE)
+```
+
+Download the data from the NOAA website:
+
+```{r}
+setInternet2(use=TRUE)
+download.file(
+"https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FStormData.csv.bz2",
+"repdata-data-StormData.csv.bz2",method="auto")
+```
+
+Read data from the downloaded file into a data frame. (Note that 'read.table' can read zipped files directly.)
+
+```{r}
+data <- read.table("repdata-data-StormData.csv.bz2",header=TRUE,sep=",")
+```
+
+The type of storm event is recorded in the 'EVTYPE' column.  Extract the unique set of event types and save these in a separate list to be used for looping later.
+
+```{r}
+event_types <- unique(data['EVTYPE'])
+event_types <- event_types[order(event_types),]
+```
+
+Create a new column matrix with year for each record.
+
+```{r}
+I <- length(data[,1])
+year <- matrix(0,I,1)
+for(i in 1:I){
+	temp1 <- data[i,"BGN_DATE"]
+	temp2 <- as.character(temp1)
+	temp3 <- unlist(strsplit(temp2,"/"))
+	temp4 <- unlist(strsplit(temp3[3]," "))
+	year[i] <- as.numeric(temp4[1])
+}
+	
+```
+
+Examine only those records for years 1990 and after.
+
+```{r}
+data <- data[year>=1990,]
+```
+
+Calculate the total fatalities, injuries, property damages, and crop damages for each event type since 1990. 
+
+```{r}
+K         <-length(event_types)
+event_fat <- matrix(0,K,1) # fatalities
+event_inj <- matrix(0,K,1) # injuries
+event_prp <- matrix(0,K,1) # property damage
+event_crp <- matrix(0,K,1) # crop damage
+for(k in 1:K){
+	temp <- data[,'EVTYPE']==event_types[k]
+	event_fat[k] <- sum(data[temp,"FATALITIES"])
+	event_inj[k] <- sum(data[temp,"INJURIES"])
+	event_prp[k] <- sum(data[temp,"PROPDMG"])
+	event_crp[k] <- sum(data[temp,"CROPDMG"])	
+}
+```
+
+Sort the event types in decreasing size of each endpoint.
+
+```{r}
+#install.packages("xtable")
+library(xtable)
+order_fat <- order(event_fat,decreasing=TRUE)
+temp1 <- event_types[order_fat]
+temp2 <- event_fat[order_fat]
+temp1[1:10]
+temp2[1:10]
+
+order_inj <- order(event_inj,decreasing=TRUE)
+temp3 <- event_types[order_inj]
+temp4 <- event_inj[order_inj]
+temp3[1:10]
+temp4[1:10]
+
+order_prp <- order(event_prp,decreasing=TRUE)
+temp5 <- event_types[order_prp]
+temp6 <- event_prp[order_prp]
+temp5[1:10]
+temp6[1:10]
+
+order_crp <- order(event_crp,decreasing=TRUE)
+temp7 <- event_types[order_crp]
+temp8 <- event_crp[order_crp]
+temp7[1:10]
+temp8[1:10]
+```
+## Results
+
+The table below shows ten event types that account for the greatest number of fatalities and injuries and the greatest amount of property damage and crop damage, respectively.   
+
+```{r results='asis'}
+df <- data.frame(temp1[1:10], temp2[1:10], temp3[1:10], temp4[1:10], temp5[1:10], temp6[1:10], temp7[1:10], temp8[1:10])
+names(df) <- c('Event type','Fatalities','Event type','Injuries','Event type','Property damage','Event type','Crop damage')
+table <- xtable(df)
+print(table,type="html")
+```
+
+The first bar plot below shows the average number of fatalities per year between 1990-2015 for the top 5 most fatal storm event types. Note that 'heat' appears twice. This occurs because there are (at least ) two event types related to fatalities due to heat exposure: "EXTREME HEAT", and "HEAT." Another example is "FLOOD" and "FLASH FLOOD." A better analysis would group closely related event types into single types, but that is beyond the sope of this preliminary analysis. 
+
+The second bar plot below shows the average property damage per year between 1990-2015 for the top 5 most damaging storm event types. The event type data coding issue shows up in this plot as well, as two types of flood events and two types of wind events show up as different event types in the plot.  
+
+```{r plot1, fig.width=8, fig.height=6, include=TRUE}
+#barplot(temp2[1:5],names.arg=temp1[1:5],horiz=FALSE)
+barplot(temp2[1:5],names.arg=c('heat','tornado','flood','heat','ltng'),horiz=FALSE)
+barplot(temp6[1:5],names.arg=c('tor','flood','wind','flood','wind'),horiz=FALSE)
+```
